@@ -6,7 +6,11 @@ import {
   Transaction,
 } from '@solana/web3.js';
 import { MARKET_STATE_LAYOUT } from '../market';
-import { initializeAccount, TOKEN_PROGRAM_ID } from '../token-instructions';
+import {
+  initializeAccount,
+  initializeMint,
+  TOKEN_PROGRAM_ID,
+} from '../token-instructions';
 import BN from '../../node_modules/bn.js/lib/bn';
 import { DEX_PROGRAM_ID, DexInstructions } from '../instructions';
 import { homedir } from 'os';
@@ -31,14 +35,10 @@ export async function send() {
   const asks = new Account();
   const baseVault = new Account();
   const quoteVault = new Account();
-  const baseMint = new PublicKey(
-    'GaagZyNM3rafvvCCyBBmkt3UbwNcQae8HDPHZXdGQ1JT',
-  );
-  const quoteMint = new PublicKey(
-    'EqvNe6FwDvQc7CTfK24eZRTe7Gba6uSo8mYWosw5Vhy7',
-  );
-  const baseLotSize = new BN(1000);
-  const quoteLotSize = new BN(10);
+  const baseMint = new Account();
+  const quoteMint = new Account();
+  const baseLotSize = new BN(100);
+  const quoteLotSize = new BN(1);
   const feeRateBps = 1;
   const quoteDustThreshold = new BN(100);
 
@@ -65,15 +65,24 @@ export async function send() {
   transaction1.add(
     SystemProgram.createAccount({
       fromPubkey: payer.publicKey,
+      newAccountPubkey: baseMint.publicKey,
+      lamports: 40 * rent,
+      space: 40,
+      programId: TOKEN_PROGRAM_ID,
+    }),
+    SystemProgram.createAccount({
+      fromPubkey: payer.publicKey,
+      newAccountPubkey: quoteMint.publicKey,
+      lamports: 40 * rent,
+      space: 40,
+      programId: TOKEN_PROGRAM_ID,
+    }),
+    SystemProgram.createAccount({
+      fromPubkey: payer.publicKey,
       newAccountPubkey: baseVault.publicKey,
       lamports: 120 * rent,
       space: 120,
       programId: TOKEN_PROGRAM_ID,
-    }),
-    initializeAccount({
-      account: baseVault.publicKey,
-      mint: baseMint,
-      owner: vaultOwner,
     }),
     SystemProgram.createAccount({
       fromPubkey: payer.publicKey,
@@ -83,9 +92,24 @@ export async function send() {
       programId: TOKEN_PROGRAM_ID,
     }),
     initializeAccount({
-      account: quoteVault.publicKey,
-      mint: quoteMint,
+      account: baseVault.publicKey,
+      mint: baseMint.publicKey,
       owner: vaultOwner,
+    }),
+    initializeAccount({
+      account: quoteVault.publicKey,
+      mint: quoteMint.publicKey,
+      owner: vaultOwner,
+    }),
+    initializeMint({
+      mint: baseMint.publicKey,
+      decimals: 3,
+      mintOwner: payer.publicKey,
+    }),
+    initializeMint({
+      mint: quoteMint.publicKey,
+      decimals: 3,
+      mintOwner: payer.publicKey,
     }),
   );
 
@@ -138,8 +162,8 @@ export async function send() {
       asks: asks.publicKey,
       baseVault: baseVault.publicKey,
       quoteVault: quoteVault.publicKey,
-      baseMint,
-      quoteMint,
+      baseMint: baseMint.publicKey,
+      quoteMint: quoteMint.publicKey,
       baseLotSize,
       quoteLotSize,
       feeRateBps,
@@ -155,6 +179,8 @@ export async function send() {
     (async () => {
       const txid = await connection.sendTransaction(transaction1, [
         payer,
+        baseMint,
+        quoteMint,
         baseVault,
         quoteVault,
       ]);
