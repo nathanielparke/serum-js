@@ -359,16 +359,22 @@ export class Market {
     clientId: BN,
   ) {
     const transaction = new Transaction();
-    transaction.add(
-      DexInstructions.cancelOrderByClientId({
-        market: this.address,
-        owner,
-        openOrders,
-        requestQueue: this._decoded.requestQueue,
-        clientId,
-      }),
-    );
+    transaction.add(this.make);
     return transaction;
+  }
+
+  makeCancelOrderByClientIdInstruction(
+    owner: PublicKey,
+    openOrders: PublicKey,
+    clientId: BN,
+  ): TransactionInstruction {
+    return DexInstructions.cancelOrderByClientId({
+      market: this.address,
+      owner,
+      openOrders,
+      requestQueue: this._decoded.requestQueue,
+      clientId,
+    });
   }
 
   async cancelOrder(connection: Connection, owner: Account, order: Order) {
